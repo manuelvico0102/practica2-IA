@@ -9,6 +9,20 @@ struct estado {
   int fila;
   int columna;
   int orientacion;
+  bool bikini;
+  bool zapatillas;
+};
+
+struct nodo
+{
+    estado st;
+    list<Action> secuencia;
+    int coste; //Nivel 2
+    int valora; //Nivel 2
+
+    inline bool operator< (const nodo& n) const{        //ordenar la cola con prioridad
+        return this->valora > n.valora;
+    }
 };
 
 class ComportamientoJugador : public Comportamiento {
@@ -39,9 +53,14 @@ class ComportamientoJugador : public Comportamiento {
     // Métodos privados de la clase
     bool pathFinding(int level, const estado &origen, const list<estado> &destino, list<Action> &plan);
     bool pathFinding_Profundidad(const estado &origen, const estado &destino, list<Action> &plan);
+    bool pathFinding_Anchura(const estado &origen, const estado &destino, list<Action> &plan);
+    bool pathFinding_costeUniforme(const estado &origen, const estado &destino, list<Action> &plan);
+
+    Action pathFinding_reactivoDeliberativo(Sensores sensores);
 
     void PintaPlan(list<Action> plan);
     bool HayObstaculoDelante(estado &st);
+    void coste(nodo &n, Action act);
 
 };
 

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <set>
 #include <stack>
+#include <queue>
 
 // Este es el método principal que se piden en la practica.
 // Tiene como entrada la información de los sensores y devuelve la acción a realizar.
@@ -52,11 +53,11 @@ Action ComportamientoJugador::think(Sensores sensores)
 // Level representa el comportamiento en el que fue iniciado el agente.
 bool ComportamientoJugador::pathFinding(int level, const estado &origen, const list<estado> &destino, list<Action> &plan)
 {
+    estado un_objetivo;
 	switch (level)
 	{
 	case 0:
 		cout << "Demo\n";
-		estado un_objetivo;
 		un_objetivo = objetivos.front();
 		cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
 		return pathFinding_Profundidad(origen, un_objetivo, plan);
@@ -64,13 +65,16 @@ bool ComportamientoJugador::pathFinding(int level, const estado &origen, const l
 
 	case 1:
 		cout << "Optimo numero de acciones\n";
-		// Incluir aqui la llamada al busqueda en anchura
-		cout << "No implementado aun\n";
+        un_objetivo = objetivos.front();
+        cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
+        return pathFinding_Anchura(origen, un_objetivo, plan);
 		break;
 	case 2:
 		cout << "Optimo en coste\n";
 		// Incluir aqui la llamada al busqueda de costo uniforme/A*
-		cout << "No implementado aun\n";
+        un_objetivo = objetivos.front();
+        cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
+        return pathFinding_costeUniforme(origen, un_objetivo, plan);
 		break;
 	case 3:
 		cout << "Reto 1: Descubrir el mapa\n";
@@ -157,12 +161,6 @@ bool ComportamientoJugador::HayObstaculoDelante(estado &st)
 		return true;
 	}
 }
-
-struct nodo
-{
-	estado st;
-	list<Action> secuencia;
-};
 
 struct ComparaEstados
 {
@@ -384,6 +382,295 @@ void ComportamientoJugador::VisualizaPlan(const estado &st, const list<Action> &
 	}
 }
 
+//Busqueda en anchura nivel 1
+//Código modificado a partir del de busqueda en profundidad.
+bool ComportamientoJugador::pathFinding_Anchura(const estado &origen, const estado &destino, list<Action> &plan){
+    // Borro la lista
+    cout << "Calculando plan\n";
+    plan.clear();
+    set<estado, ComparaEstados> Cerrados; // Lista de Cerrados
+    queue<nodo> Abiertos;				  // Lista de Abiertos
+
+    nodo current;
+    current.st = origen;
+    current.secuencia.empty();
+
+    Abiertos.push(current);
+
+    while (!Abiertos.empty() and (current.st.fila != destino.fila or current.st.columna != destino.columna))
+    {
+
+        Abiertos.pop();
+        Cerrados.insert(current.st);
+
+        // Generar descendiente de girar a la derecha 90 grados
+        nodo hijoTurnR = current;
+        hijoTurnR.st.orientacion = (hijoTurnR.st.orientacion + 2) % 8;
+        if (Cerrados.find(hijoTurnR.st) == Cerrados.end())
+        {
+            hijoTurnR.secuencia.push_back(actTURN_R);
+            Abiertos.push(hijoTurnR);
+        }
+
+        // Generar descendiente de girar a la derecha 45 grados
+        nodo hijoSEMITurnR = current;
+        hijoSEMITurnR.st.orientacion = (hijoSEMITurnR.st.orientacion + 1) % 8;
+        if (Cerrados.find(hijoSEMITurnR.st) == Cerrados.end())
+        {
+            hijoSEMITurnR.secuencia.push_back(actSEMITURN_R);
+            Abiertos.push(hijoSEMITurnR);
+        }
+
+        // Generar descendiente de girar a la izquierda 90 grados
+        nodo hijoTurnL = current;
+        hijoTurnL.st.orientacion = (hijoTurnL.st.orientacion + 6) % 8;
+        if (Cerrados.find(hijoTurnL.st) == Cerrados.end())
+        {
+            hijoTurnL.secuencia.push_back(actTURN_L);
+            Abiertos.push(hijoTurnL);
+        }
+
+        // Generar descendiente de girar a la izquierda 45 grados
+        nodo hijoSEMITurnL = current;
+        hijoSEMITurnL.st.orientacion = (hijoSEMITurnL.st.orientacion + 7) % 8;
+        if (Cerrados.find(hijoSEMITurnL.st) == Cerrados.end())
+        {
+            hijoSEMITurnL.secuencia.push_back(actSEMITURN_L);
+            Abiertos.push(hijoSEMITurnL);
+        }
+
+        // Generar descendiente de avanzar
+        nodo hijoForward = current;
+        if (!HayObstaculoDelante(hijoForward.st))
+        {
+            if (Cerrados.find(hijoForward.st) == Cerrados.end())
+            {
+                hijoForward.secuencia.push_back(actFORWARD);
+                Abiertos.push(hijoForward);
+            }
+        }
+
+        // Tomo el siguiente valor de la Abiertos
+        if (!Abiertos.empty())
+        {
+            current = Abiertos.front();
+        }
+    }
+
+    cout << "Terminada la busqueda\n";
+
+    if (current.st.fila == destino.fila and current.st.columna == destino.columna)
+    {
+        cout << "Cargando el plan\n";
+        plan = current.secuencia;
+        cout << "Longitud del plan: " << plan.size() << endl;
+        PintaPlan(plan);
+        // ver el plan en el mapa
+        VisualizaPlan(origen, plan);
+        return true;
+    }
+    else
+    {
+        cout << "No encontrado plan\n";
+    }
+
+    return false;
+}
+//Calcular el coste de un movimiento
+//coste para moverse a una celda
+void ComportamientoJugador::coste (nodo &n, Action act){
+    int coste = 0;
+    char casilla = mapaResultado[n.st.fila][n.st.columna];
+
+    if(act == actIDLE){
+        n.coste = coste;
+    }else{
+        coste = 1; //Por defecto será coste 1 todas las casillas
+        if(casilla == 'A'){
+            if(act == actFORWARD){
+                coste = 200;
+                if(n.st.bikini)
+                    coste = 10;
+            }else if(act == actTURN_R || act == actTURN_L){
+                coste = 500;
+                if(n.st.bikini)
+                    coste = 5;
+            }else if(act == actSEMITURN_R || act == actSEMITURN_L){
+                coste = 300;
+                if(n.st.bikini)
+                    coste = 2;
+            }
+        }else if(casilla == 'B'){
+            if(act == actFORWARD){
+                coste = 100;
+                if(n.st.zapatillas)
+                    coste = 15;
+            }else if(act == actTURN_R || act == actTURN_L){
+                coste = 3;
+                if(n.st.zapatillas)
+                    coste = 1;
+            }else if(act == actSEMITURN_R || act == actSEMITURN_L){
+                coste = 2;
+                if(n.st.zapatillas)
+                    coste = 1;
+            }
+        }else if(casilla == 'T'){
+            if(act == actFORWARD){
+                coste = 2;
+            }else if(act == actTURN_R || act == actTURN_L){
+                coste = 2;
+            }else if(act == actSEMITURN_R || act == actSEMITURN_L){
+                coste = 1;
+            }
+        }
+    }
+    n.coste = coste;
+}
+
+//Comparar estados para el nivel 2
+//Ya que depende del coste
+struct ComparaEstados2{
+    bool operator()(const estado &a, const estado &n) const
+    {
+        if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or
+            (a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion) or
+            (a.fila == n.fila && a.columna == n.columna && a.orientacion == n.orientacion && a.bikini > n.bikini) or
+            (a.fila == n.fila && a.columna == n.columna && a.orientacion == n.orientacion && a.zapatillas > n.zapatillas))
+            return true;
+        else
+            return false;
+    }
+};
+//Nivel 2 costeUniforme
+bool ComportamientoJugador::pathFinding_costeUniforme(const estado &origen, const estado &destino, list<Action> &plan) {
+    // Borro la lista
+    cout << "Calculando plan\n";
+    plan.clear();
+    set<estado, ComparaEstados2> Cerrados; // Lista de Cerrados
+    priority_queue<nodo> Abiertos;		   // Lista de Abiertos
+
+    nodo current;
+    current.st = origen;
+    current.secuencia.empty();
+
+    //Inicialización de datos
+    current.st.zapatillas = false;
+    current.st.bikini = false;
+    coste(current, actIDLE);
+    current.valora = current.coste;
+
+    Abiertos.push(current);
+
+    while (!Abiertos.empty() and (current.st.fila != destino.fila or current.st.columna != destino.columna))
+    {
+
+        Abiertos.pop();
+        Cerrados.insert(current.st);
+
+        if(mapaResultado[current.st.fila][current.st.fila] == 'D'){
+            current.st.zapatillas = true;
+            if(current.st.bikini)
+                current.st.bikini = false;
+        }
+
+        if(mapaResultado[current.st.fila][current.st.fila] == 'K'){
+            current.st.bikini = true;
+            if(current.st.zapatillas)
+                current.st.zapatillas = false;
+        }
+
+        // Generar descendiente de girar a la derecha 90 grados
+        nodo hijoTurnR = current;
+        hijoTurnR.st.orientacion = (hijoTurnR.st.orientacion + 2) % 8;
+        coste(hijoTurnR, actTURN_R);
+        hijoTurnR.coste = hijoTurnR.coste + current.coste;
+        hijoTurnR.valora = hijoTurnR.coste;
+        if (Cerrados.find(hijoTurnR.st) == Cerrados.end())
+        {
+            hijoTurnR.secuencia.push_back(actTURN_R);
+            Abiertos.push(hijoTurnR);
+        }
+
+        // Generar descendiente de girar a la derecha 45 grados
+        nodo hijoSEMITurnR = current;
+        hijoSEMITurnR.st.orientacion = (hijoSEMITurnR.st.orientacion + 1) % 8;
+        coste(hijoSEMITurnR, actSEMITURN_R);
+        hijoSEMITurnR.coste = hijoSEMITurnR.coste + current.coste;
+        hijoSEMITurnR.valora = hijoSEMITurnR.coste;
+        if (Cerrados.find(hijoSEMITurnR.st) == Cerrados.end())
+        {
+            hijoSEMITurnR.secuencia.push_back(actSEMITURN_R);
+            Abiertos.push(hijoSEMITurnR);
+        }
+
+        // Generar descendiente de girar a la izquierda 90 grados
+        nodo hijoTurnL = current;
+        hijoTurnL.st.orientacion = (hijoTurnL.st.orientacion + 6) % 8;
+        coste(hijoTurnL, actTURN_L);
+        hijoTurnL.coste = hijoTurnL.coste + current.coste;
+        hijoTurnL.valora = hijoTurnL.coste;
+        if (Cerrados.find(hijoTurnL.st) == Cerrados.end())
+        {
+            hijoTurnL.secuencia.push_back(actTURN_L);
+            Abiertos.push(hijoTurnL);
+        }
+
+        // Generar descendiente de girar a la izquierda 45 grados
+        nodo hijoSEMITurnL = current;
+        hijoSEMITurnL.st.orientacion = (hijoSEMITurnL.st.orientacion + 7) % 8;
+        coste(hijoSEMITurnL, actSEMITURN_L);
+        hijoSEMITurnL.coste = hijoSEMITurnL.coste + current.coste;
+        hijoSEMITurnL.valora = hijoSEMITurnL.coste;
+        if (Cerrados.find(hijoSEMITurnL.st) == Cerrados.end())
+        {
+            hijoSEMITurnL.secuencia.push_back(actSEMITURN_L);
+            Abiertos.push(hijoSEMITurnL);
+        }
+
+        // Generar descendiente de avanzar
+        nodo hijoForward = current;
+        coste(hijoForward, actFORWARD);
+        hijoForward.coste = hijoForward.coste + current.coste;
+        hijoForward.valora = hijoForward.coste;
+        if (!HayObstaculoDelante(hijoForward.st))
+        {
+            if (Cerrados.find(hijoForward.st) == Cerrados.end())
+            {
+                hijoForward.secuencia.push_back(actFORWARD);
+                Abiertos.push(hijoForward);
+            }
+        }
+
+        // Tomo el siguiente valor de la Abiertos
+        if (!Abiertos.empty())
+        {
+            current = Abiertos.top();
+        }
+    }
+
+    cout << "Terminada la busqueda\n";
+
+    if (current.st.fila == destino.fila and current.st.columna == destino.columna)
+    {
+        cout << "Cargando el plan\n";
+        plan = current.secuencia;
+        cout << "Longitud del plan: " << plan.size() << endl;
+        PintaPlan(plan);
+        // ver el plan en el mapa
+        VisualizaPlan(origen, plan);
+        return true;
+    }
+    else
+    {
+        cout << "No encontrado plan\n";
+    }
+
+    return false;
+}
+Action ComportamientoJugador::pathFinding_reactivoDeliberativo(Sensores sensores) {
+
+
+}
 int ComportamientoJugador::interact(Action accion, int valor)
 {
 	return false;
