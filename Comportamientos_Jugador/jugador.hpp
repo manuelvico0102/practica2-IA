@@ -30,10 +30,17 @@ class ComportamientoJugador : public Comportamiento {
     ComportamientoJugador(unsigned int size) : Comportamiento(size) {
       // Inicializar Variables de Estado
       hayPlan = false;
+      inicio_partida = true;
+      ultimaAccion = actIDLE;
+      bien_situado = false;
     }
     ComportamientoJugador(std::vector< std::vector< unsigned char> > mapaR) : Comportamiento(mapaR) {
       // Inicializar Variables de Estado
       hayPlan = false;
+      inicio_partida = true;
+      ultimaAccion = actIDLE;
+      bien_situado = false;
+
     }
     ComportamientoJugador(const ComportamientoJugador & comport) : Comportamiento(comport){}
     ~ComportamientoJugador(){}
@@ -49,14 +56,16 @@ class ComportamientoJugador : public Comportamiento {
     list<estado> objetivos;
     list<Action> plan;
     bool hayPlan;
+    bool inicio_partida;
+    Action ultimaAccion;
+    bool bien_situado;
 
     // Métodos privados de la clase
     bool pathFinding(int level, const estado &origen, const list<estado> &destino, list<Action> &plan);
     bool pathFinding_Profundidad(const estado &origen, const estado &destino, list<Action> &plan);
     bool pathFinding_Anchura(const estado &origen, const estado &destino, list<Action> &plan);
     bool pathFinding_costeUniforme(const estado &origen, const estado &destino, list<Action> &plan);
-
-    Action pathFinding_reactivoDeliberativo(Sensores sensores);
+    bool pathFinding_reactivoDeriverativo(const estado &origen, const estado &destino, list<Action> &plan);
 
     void PintaPlan(list<Action> plan);
     bool HayObstaculoDelante(estado &st);

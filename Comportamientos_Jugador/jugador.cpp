@@ -12,8 +12,6 @@
 // Para ver los distintos sensores mirar fichero "comportamiento.hpp"
 Action ComportamientoJugador::think(Sensores sensores)
 {
-
-
 	actual.fila = sensores.posF;
 	actual.columna = sensores.posC;
 	actual.orientacion = sensores.sentido;
@@ -21,31 +19,178 @@ Action ComportamientoJugador::think(Sensores sensores)
 	cout << "Fila: " << actual.fila << endl;
 	cout << "Col : " << actual.columna << endl;
 	cout << "Ori : " << actual.orientacion << endl;
-
-	// Capturo los destinos
-	cout << "sensores.num_destinos : " << sensores.num_destinos << endl;
-	objetivos.clear();
-	for (int i = 0; i < sensores.num_destinos; i++)
-	{
-		estado aux;
-		aux.fila = sensores.destino[2 * i];
-		aux.columna = sensores.destino[2 * i + 1];
-		objetivos.push_back(aux);
-	}
-
-    //Si no hay plan, cconstruyo uno
-    if(!hayPlan) {
-        hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
-    }
-
     Action accion = actIDLE;
-	if(hayPlan && plan.size()>0){   //Hay un plan no vacio
-        accion = plan.front();      //Tomo la siguiente acción del plan
-        plan.erase(plan.begin()); //Eliminamos la acción del plan
+    // Capturo los destinos
+    if(sensores.nivel <= 2) {
+        cout << "sensores.num_destinos : " << sensores.num_destinos << endl;
+        objetivos.clear();
+        for (int i = 0; i < sensores.num_destinos; i++) {
+            estado aux;
+            aux.fila = sensores.destino[2 * i];
+            aux.columna = sensores.destino[2 * i + 1];
+            objetivos.push_back(aux);
+        }
+
+        //Si no hay plan, cconstruyo uno
+        if (!hayPlan) {
+            hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
+        }
+
+        accion = actIDLE;
+        if (hayPlan && plan.size() > 0) {   //Hay un plan no vacio
+            accion = plan.front();      //Tomo la siguiente acción del plan
+            plan.erase(plan.begin()); //Eliminamos la acción del plan
+        } else {
+            cout << "No se pudo encontrar un plan\n";
+        }
     }else{
-        cout << "No se pudo encontrar un plan\n";
+        //nivel 3
+
+        if(mapaResultado[actual.fila][actual.fila] == 'D'){
+            actual.zapatillas = true;
+            if(actual.bikini)
+                actual.bikini = false;
+        }
+
+        if(mapaResultado[actual.fila][actual.fila] == 'K'){
+            actual.bikini = true;
+            if(actual.zapatillas)
+                actual.zapatillas = false;
+        }
+
+        if(ultimaAccion == actWHEREIS || sensores.nivel == 3){
+            bien_situado = true;
+        }
+
+        if(bien_situado){
+            mapaResultado[actual.fila][actual.columna] = sensores.terreno[0];
+            if(sensores.sentido == 0) {                                         //Mirando al norte
+                int k=1;
+                for(int i = -1; i <= 1; i++){
+                    mapaResultado[actual.fila-1][actual.columna+i] = sensores.terreno[k]; k++;
+                }
+                for(int i = -2; i <= 2; i++){
+                    mapaResultado[actual.fila-2][actual.columna+i] = sensores.terreno[k]; k++;
+                }
+                for(int i = -3; i <= 3; i++){
+                    mapaResultado[actual.fila-3][actual.columna+i] = sensores.terreno[k]; k++;
+                }
+            }else if(sensores.sentido == 1){                                    //Mirando al noreste
+                mapaResultado[actual.fila - 1][actual.columna + 0] = sensores.terreno[1];
+                mapaResultado[actual.fila - 1][actual.columna + 1] = sensores.terreno[2];
+                mapaResultado[actual.fila - 0][actual.columna + 1] = sensores.terreno[3];
+                mapaResultado[actual.fila - 2][actual.columna + 0] = sensores.terreno[4];
+                mapaResultado[actual.fila - 2][actual.columna + 1] = sensores.terreno[5];
+                mapaResultado[actual.fila - 2][actual.columna + 2] = sensores.terreno[6];
+                mapaResultado[actual.fila - 1][actual.columna + 2] = sensores.terreno[7];
+                mapaResultado[actual.fila - 0][actual.columna + 2] = sensores.terreno[8];
+                mapaResultado[actual.fila - 3][actual.columna + 0] = sensores.terreno[9];
+                mapaResultado[actual.fila - 3][actual.columna + 1] = sensores.terreno[10];
+                mapaResultado[actual.fila - 3][actual.columna + 2] = sensores.terreno[11];
+                mapaResultado[actual.fila - 3][actual.columna + 3] = sensores.terreno[12];
+                mapaResultado[actual.fila - 2][actual.columna + 3] = sensores.terreno[13];
+                mapaResultado[actual.fila - 1][actual.columna + 3] = sensores.terreno[14];
+                mapaResultado[actual.fila - 0][actual.columna + 3] = sensores.terreno[15];
+
+            }else if(sensores.sentido == 2){                                    //Mirando al este
+                int k=1;
+                for(int i = -1; i <= 1; i++){
+                    mapaResultado[actual.fila+i][actual.columna+1] = sensores.terreno[k]; k++;
+                }
+                for(int i = -2; i <= 2; i++){
+                    mapaResultado[actual.fila+i][actual.columna+2] = sensores.terreno[k]; k++;
+                }
+                for(int i = -3; i <= 3; i++){
+                    mapaResultado[actual.fila+i][actual.columna+3] = sensores.terreno[k]; k++;
+                }
+            }else if(sensores.sentido == 3){                                    //Mirando al sureste
+                mapaResultado[actual.fila + 0][actual.columna + 1] = sensores.terreno[1];
+                mapaResultado[actual.fila + 1][actual.columna + 1] = sensores.terreno[2];
+                mapaResultado[actual.fila + 1][actual.columna + 0] = sensores.terreno[3];
+                mapaResultado[actual.fila + 0][actual.columna + 2] = sensores.terreno[4];
+                mapaResultado[actual.fila + 1][actual.columna + 2] = sensores.terreno[5];
+                mapaResultado[actual.fila + 2][actual.columna + 2] = sensores.terreno[6];
+                mapaResultado[actual.fila + 2][actual.columna + 1] = sensores.terreno[7];
+                mapaResultado[actual.fila + 2][actual.columna + 0] = sensores.terreno[8];
+                mapaResultado[actual.fila + 0][actual.columna + 3] = sensores.terreno[9];
+                mapaResultado[actual.fila + 1][actual.columna + 3] = sensores.terreno[10];
+                mapaResultado[actual.fila + 2][actual.columna + 3] = sensores.terreno[11];
+                mapaResultado[actual.fila + 3][actual.columna + 3] = sensores.terreno[12];
+                mapaResultado[actual.fila + 3][actual.columna + 2] = sensores.terreno[13];
+                mapaResultado[actual.fila + 3][actual.columna + 1] = sensores.terreno[14];
+                mapaResultado[actual.fila + 3][actual.columna + 0] = sensores.terreno[15];
+            }else if(sensores.sentido == 4) {                                   //Mirando al sur
+                int k=1;
+                for(int i = -1; i <= 1; i++){
+                    mapaResultado[actual.fila+1][actual.columna-i] = sensores.terreno[k]; k++;
+                }
+                for(int i = -2; i <= 2; i++){
+                    mapaResultado[actual.fila+2][actual.columna-i] = sensores.terreno[k]; k++;
+                }
+                for(int i = -3; i <= 3; i++){
+                    mapaResultado[actual.fila+3][actual.columna-i] = sensores.terreno[k]; k++;
+                }
+            }else if(sensores.sentido == 5){                                     //Mirando al suroeste
+                mapaResultado[actual.fila + 1][actual.columna - 0] = sensores.terreno[1];
+                mapaResultado[actual.fila + 1][actual.columna - 1] = sensores.terreno[2];
+                mapaResultado[actual.fila + 0][actual.columna - 1] = sensores.terreno[3];
+                mapaResultado[actual.fila + 2][actual.columna - 0] = sensores.terreno[4];
+                mapaResultado[actual.fila + 2][actual.columna - 1] = sensores.terreno[5];
+                mapaResultado[actual.fila + 2][actual.columna - 2] = sensores.terreno[6];
+                mapaResultado[actual.fila + 1][actual.columna - 2] = sensores.terreno[7];
+                mapaResultado[actual.fila + 0][actual.columna - 2] = sensores.terreno[8];
+                mapaResultado[actual.fila + 3][actual.columna - 0] = sensores.terreno[9];
+                mapaResultado[actual.fila + 3][actual.columna - 1] = sensores.terreno[10];
+                mapaResultado[actual.fila + 3][actual.columna - 2] = sensores.terreno[11];
+                mapaResultado[actual.fila + 3][actual.columna - 3] = sensores.terreno[12];
+                mapaResultado[actual.fila + 2][actual.columna - 3] = sensores.terreno[13];
+                mapaResultado[actual.fila + 1][actual.columna - 3] = sensores.terreno[14];
+                mapaResultado[actual.fila + 0][actual.columna - 3] = sensores.terreno[15];
+
+            } else if(sensores.sentido == 6) {                                   //Mirando al oeste
+                int k=1;
+                for(int i = -1; i <= 1; i++){
+                    mapaResultado[actual.fila-i][actual.columna-1] = sensores.terreno[k]; k++;
+                }
+                for(int i = -2; i <= 2; i++){
+                    mapaResultado[actual.fila-i][actual.columna-2] = sensores.terreno[k]; k++;
+                }
+                for(int i = -3; i <= 3; i++){
+                    mapaResultado[actual.fila-i][actual.columna-3] = sensores.terreno[k]; k++;
+                }
+            }else if(sensores.sentido == 7){                                      //Mirando al noroeste
+                mapaResultado[actual.fila - 0][actual.columna - 1] = sensores.terreno[1];
+                mapaResultado[actual.fila - 1][actual.columna - 1] = sensores.terreno[2];
+                mapaResultado[actual.fila - 1][actual.columna - 0] = sensores.terreno[3];
+                mapaResultado[actual.fila - 0][actual.columna - 2] = sensores.terreno[4];
+                mapaResultado[actual.fila - 1][actual.columna - 2] = sensores.terreno[5];
+                mapaResultado[actual.fila - 2][actual.columna - 2] = sensores.terreno[6];
+                mapaResultado[actual.fila - 2][actual.columna - 1] = sensores.terreno[7];
+                mapaResultado[actual.fila - 2][actual.columna - 0] = sensores.terreno[8];
+                mapaResultado[actual.fila - 0][actual.columna - 3] = sensores.terreno[9];
+                mapaResultado[actual.fila - 1][actual.columna - 3] = sensores.terreno[10];
+                mapaResultado[actual.fila - 2][actual.columna - 3] = sensores.terreno[11];
+                mapaResultado[actual.fila - 3][actual.columna - 3] = sensores.terreno[12];
+                mapaResultado[actual.fila - 3][actual.columna - 2] = sensores.terreno[13];
+                mapaResultado[actual.fila - 3][actual.columna - 1] = sensores.terreno[14];
+                mapaResultado[actual.fila - 3][actual.columna - 0] = sensores.terreno[15];
+            }
+        }
     }
 
+    if(inicio_partida){
+        int tam = mapaResultado.size();
+        for(int i = 0; i < tam; i++){                                   //Rellenará el mapaResultado de precipios,
+            for(int j = 0; j < tam; j++){                               //ya que es una mapa cerrado, según lo indicado
+                if(i <= 2 || i >= tam-3 || j <= 2 || j >= tam-3){       // en el guión
+                    mapaResultado[i][j] = 'P';
+                }
+            }
+        }
+        //accion = actWHEREIS;
+        inicio_partida = false;
+    }
+    ultimaAccion = accion;
     return accion;
 }
 
@@ -78,7 +223,8 @@ bool ComportamientoJugador::pathFinding(int level, const estado &origen, const l
 		break;
 	case 3:
 		cout << "Reto 1: Descubrir el mapa\n";
-		// Incluir aqui la llamada al algoritmo de busqueda para el Reto 1
+
+        return pathFinding_reactivoDeriverativo(origen, un_objetivo, plan);
 		cout << "No implementado aun\n";
 		break;
 	case 4:
@@ -667,7 +813,14 @@ bool ComportamientoJugador::pathFinding_costeUniforme(const estado &origen, cons
 
     return false;
 }
-Action ComportamientoJugador::pathFinding_reactivoDeliberativo(Sensores sensores) {
+bool ComportamientoJugador::pathFinding_reactivoDeriverativo(const estado &origen, const estado &destino, list<Action> &plan) {
+
+
+    nodo current;
+    current.st = origen;
+    current.secuencia.empty();
+
+    return false;
 
 
 }
