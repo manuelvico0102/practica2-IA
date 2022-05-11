@@ -776,7 +776,7 @@ void ComportamientoJugador::PintaPlan(list<Action> plan)
 		}
 		else if (*it == actSEMITURN_L)
 		{
-			cout << "I ";
+			cout << "i ";
 		}
 		else
 		{
