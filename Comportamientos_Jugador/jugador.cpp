@@ -6,6 +6,7 @@
 #include <set>
 #include <stack>
 #include <queue>
+#include <stdlib.h>
 
 // Este es el método principal que se piden en la practica.
 // Tiene como entrada la información de los sensores y devuelve la acción a realizar.
@@ -21,16 +22,18 @@ Action ComportamientoJugador::think(Sensores sensores)
 	cout << "Ori : " << actual.orientacion << endl;
     Action accion = actIDLE;
     // Capturo los destinos
-    if(sensores.nivel <= 2) {
-        cout << "sensores.num_destinos : " << sensores.num_destinos << endl;
-        objetivos.clear();
-        for (int i = 0; i < sensores.num_destinos; i++) {
-            estado aux;
-            aux.fila = sensores.destino[2 * i];
-            aux.columna = sensores.destino[2 * i + 1];
-            objetivos.push_back(aux);
-        }
 
+    n_destinos = sensores.num_destinos;
+    cout << "sensores.num_destinos : " << sensores.num_destinos << endl;
+    objetivos.clear();
+    for (int i = 0; i < sensores.num_destinos; i++) {
+        estado aux;
+        aux.fila = sensores.destino[2 * i];
+        aux.columna = sensores.destino[2 * i + 1];
+        objetivos.push_back(aux);
+    }
+
+    if(sensores.nivel <= 2) {
         //Si no hay plan, cconstruyo uno
         if (!hayPlan) {
             hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
@@ -43,154 +46,485 @@ Action ComportamientoJugador::think(Sensores sensores)
         } else {
             cout << "No se pudo encontrar un plan\n";
         }
-    }else{
-        //nivel 3
+    }else {
+        //nivel 3 y 4
+        if (inicio_partida) {
+            int tam = mapaResultado.size();
+            for (int i = 0; i < tam; i++) {                                   //Rellenará el mapaResultado de precipios,
+                for (int j = 0;
+                     j < tam; j++) {                               //ya que es una mapa cerrado, según lo indicado
+                    if (i <= 2 || i >= tam - 3 || j <= 2 || j >= tam - 3) {       // en el guión
+                        mapaResultado[i][j] = 'P';
+                    }
+                }
+            }
 
-        if(mapaResultado[actual.fila][actual.fila] == 'D'){
+            n_avanzadas = 15;       //Por defecto
+            cant_bateria = 1500;
+
+            if (mapaResultado.size() <= 30) {
+                n_avanzadas = 5;
+                cant_bateria = 1000;
+            } else if (mapaResultado.size() > 30 && mapaResultado.size() <= 50) {
+                n_avanzadas = 15;
+                cant_bateria = 500;
+            } else if (mapaResultado.size() > 50 && mapaResultado.size() <= 75) {
+                n_avanzadas = 20;
+                cant_bateria = 500;
+            } else if (mapaResultado.size() > 75 && mapaResultado.size() <= 100) {
+                n_avanzadas = 20;
+                cant_bateria = 500;
+            }
+            ultimaAccion = actIDLE;
+            inicio_partida = false;
+        }
+
+        accion = actIDLE;
+        //actualización del conocimiento
+        switch (ultimaAccion) {
+            case actFORWARD:
+                switch (brujula) {
+                    case 0:
+                        fil--;
+                        break;        //Norte
+                    case 1:
+                        col++;
+                        fil--;
+                        break;        //Noreste
+                    case 2:
+                        col++;
+                        break;        //Este
+                    case 3:
+                        col++;
+                        fil++;
+                        break;        //Sureste
+                    case 4:
+                        fil++;
+                        break;        //Sur
+                    case 5:
+                        fil++;
+                        col--;
+                        break;        //Suroeste
+                    case 6:
+                        col--;
+                        break;        //Oeste
+                    case 7:
+                        col--;
+                        fil--;
+                        break;        //Noroeste
+                }
+
+                //Actualizo en cada momento el estado de la carga
+                cargado = false;
+                if (sensores.bateria >= 900)
+                    cargado = true;
+
+                break;
+
+            case actTURN_L:
+                brujula = (brujula + 6) % 8;
+                girar = rand() % 4;
+
+                cargado = false;
+                if (sensores.bateria >= 900)
+                    cargado = true;
+
+                break;
+
+            case actTURN_R:
+                brujula = (brujula + 2) % 8;
+                girar = rand() % 4;
+
+                cargado = false;
+                if (sensores.bateria >= 900)
+                    cargado = true;
+
+                break;
+
+            case actSEMITURN_L:
+                brujula = (brujula + 7) % 8;
+                girar = rand() % 4;
+
+                cargado = false;
+                if (sensores.bateria >= 900)
+                    cargado = true;
+                break;
+
+            case actSEMITURN_R:
+                brujula = (brujula + 1) % 8;
+                girar = rand() % 4;
+
+                cargado = false;
+                if (sensores.bateria >= 900)
+                    cargado = true;
+
+                break;
+
+            case actIDLE:
+                cargado = false;
+                if (sensores.bateria >= 2500)
+                    cargado = true;
+
+                break;
+        }
+
+
+        if (sensores.terreno[0] == 'D') {
             actual.zapatillas = true;
-            if(actual.bikini)
-                actual.bikini = false;
+            actual.bikini = false;
+            cantobjetos++;
         }
 
-        if(mapaResultado[actual.fila][actual.fila] == 'K'){
+        if (sensores.terreno[0] == 'K') {
             actual.bikini = true;
-            if(actual.zapatillas)
-                actual.zapatillas = false;
+            actual.zapatillas = false;
+            cantobjetos++;
         }
 
-        if(ultimaAccion == actWHEREIS || sensores.nivel == 3){
+        if (sensores.reset || sensores.colision)
+            bien_situado = false;
+
+        if (ultimaAccion == actWHEREIS || sensores.nivel == 3) {
             bien_situado = true;
+            fil = sensores.posF;
+            col = sensores.posC;
+            brujula = sensores.sentido;
         }
 
-        if(bien_situado){
-            mapaResultado[actual.fila][actual.columna] = sensores.terreno[0];
-            if(sensores.sentido == 0) {                                         //Mirando al norte
-                int k=1;
-                for(int i = -1; i <= 1; i++){
-                    mapaResultado[actual.fila-1][actual.columna+i] = sensores.terreno[k]; k++;
+        if (bien_situado) {
+            mapaResultado[fil][col] = sensores.terreno[0];
+            if (brujula == 0) {                                         //Mirando al norte
+                int k = 1;
+                for (int i = -1; i <= 1; i++) {
+                    mapaResultado[fil - 1][col + i] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -2; i <= 2; i++){
-                    mapaResultado[actual.fila-2][actual.columna+i] = sensores.terreno[k]; k++;
+                for (int i = -2; i <= 2; i++) {
+                    mapaResultado[fil - 2][col + i] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -3; i <= 3; i++){
-                    mapaResultado[actual.fila-3][actual.columna+i] = sensores.terreno[k]; k++;
+                for (int i = -3; i <= 3; i++) {
+                    mapaResultado[fil - 3][col + i] = sensores.terreno[k];
+                    k++;
                 }
-            }else if(sensores.sentido == 1){                                    //Mirando al noreste
-                mapaResultado[actual.fila - 1][actual.columna + 0] = sensores.terreno[1];
-                mapaResultado[actual.fila - 1][actual.columna + 1] = sensores.terreno[2];
-                mapaResultado[actual.fila - 0][actual.columna + 1] = sensores.terreno[3];
-                mapaResultado[actual.fila - 2][actual.columna + 0] = sensores.terreno[4];
-                mapaResultado[actual.fila - 2][actual.columna + 1] = sensores.terreno[5];
-                mapaResultado[actual.fila - 2][actual.columna + 2] = sensores.terreno[6];
-                mapaResultado[actual.fila - 1][actual.columna + 2] = sensores.terreno[7];
-                mapaResultado[actual.fila - 0][actual.columna + 2] = sensores.terreno[8];
-                mapaResultado[actual.fila - 3][actual.columna + 0] = sensores.terreno[9];
-                mapaResultado[actual.fila - 3][actual.columna + 1] = sensores.terreno[10];
-                mapaResultado[actual.fila - 3][actual.columna + 2] = sensores.terreno[11];
-                mapaResultado[actual.fila - 3][actual.columna + 3] = sensores.terreno[12];
-                mapaResultado[actual.fila - 2][actual.columna + 3] = sensores.terreno[13];
-                mapaResultado[actual.fila - 1][actual.columna + 3] = sensores.terreno[14];
-                mapaResultado[actual.fila - 0][actual.columna + 3] = sensores.terreno[15];
+            } else if (brujula == 1) {                                    //Mirando al noreste
+                mapaResultado[fil - 1][col + 0] = sensores.terreno[1];
+                mapaResultado[fil - 1][col + 1] = sensores.terreno[2];
+                mapaResultado[fil - 0][col + 1] = sensores.terreno[3];
+                mapaResultado[fil - 2][col + 0] = sensores.terreno[4];
+                mapaResultado[fil - 2][col + 1] = sensores.terreno[5];
+                mapaResultado[fil - 2][col + 2] = sensores.terreno[6];
+                mapaResultado[fil - 1][col + 2] = sensores.terreno[7];
+                mapaResultado[fil - 0][col + 2] = sensores.terreno[8];
+                mapaResultado[fil - 3][col + 0] = sensores.terreno[9];
+                mapaResultado[fil - 3][col + 1] = sensores.terreno[10];
+                mapaResultado[fil - 3][col + 2] = sensores.terreno[11];
+                mapaResultado[fil - 3][col + 3] = sensores.terreno[12];
+                mapaResultado[fil - 2][col + 3] = sensores.terreno[13];
+                mapaResultado[fil - 1][col + 3] = sensores.terreno[14];
+                mapaResultado[fil - 0][col + 3] = sensores.terreno[15];
 
-            }else if(sensores.sentido == 2){                                    //Mirando al este
-                int k=1;
-                for(int i = -1; i <= 1; i++){
-                    mapaResultado[actual.fila+i][actual.columna+1] = sensores.terreno[k]; k++;
+            } else if (brujula == 2) {                                    //Mirando al este
+                int k = 1;
+                for (int i = -1; i <= 1; i++) {
+                    mapaResultado[fil + i][col + 1] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -2; i <= 2; i++){
-                    mapaResultado[actual.fila+i][actual.columna+2] = sensores.terreno[k]; k++;
+                for (int i = -2; i <= 2; i++) {
+                    mapaResultado[fil + i][col + 2] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -3; i <= 3; i++){
-                    mapaResultado[actual.fila+i][actual.columna+3] = sensores.terreno[k]; k++;
+                for (int i = -3; i <= 3; i++) {
+                    mapaResultado[fil + i][col + 3] = sensores.terreno[k];
+                    k++;
                 }
-            }else if(sensores.sentido == 3){                                    //Mirando al sureste
-                mapaResultado[actual.fila + 0][actual.columna + 1] = sensores.terreno[1];
-                mapaResultado[actual.fila + 1][actual.columna + 1] = sensores.terreno[2];
-                mapaResultado[actual.fila + 1][actual.columna + 0] = sensores.terreno[3];
-                mapaResultado[actual.fila + 0][actual.columna + 2] = sensores.terreno[4];
-                mapaResultado[actual.fila + 1][actual.columna + 2] = sensores.terreno[5];
-                mapaResultado[actual.fila + 2][actual.columna + 2] = sensores.terreno[6];
-                mapaResultado[actual.fila + 2][actual.columna + 1] = sensores.terreno[7];
-                mapaResultado[actual.fila + 2][actual.columna + 0] = sensores.terreno[8];
-                mapaResultado[actual.fila + 0][actual.columna + 3] = sensores.terreno[9];
-                mapaResultado[actual.fila + 1][actual.columna + 3] = sensores.terreno[10];
-                mapaResultado[actual.fila + 2][actual.columna + 3] = sensores.terreno[11];
-                mapaResultado[actual.fila + 3][actual.columna + 3] = sensores.terreno[12];
-                mapaResultado[actual.fila + 3][actual.columna + 2] = sensores.terreno[13];
-                mapaResultado[actual.fila + 3][actual.columna + 1] = sensores.terreno[14];
-                mapaResultado[actual.fila + 3][actual.columna + 0] = sensores.terreno[15];
-            }else if(sensores.sentido == 4) {                                   //Mirando al sur
-                int k=1;
-                for(int i = -1; i <= 1; i++){
-                    mapaResultado[actual.fila+1][actual.columna-i] = sensores.terreno[k]; k++;
+            } else if (brujula == 3) {                                    //Mirando al sureste
+                mapaResultado[fil + 0][col + 1] = sensores.terreno[1];
+                mapaResultado[fil + 1][col + 1] = sensores.terreno[2];
+                mapaResultado[fil + 1][col + 0] = sensores.terreno[3];
+                mapaResultado[fil + 0][col + 2] = sensores.terreno[4];
+                mapaResultado[fil + 1][col + 2] = sensores.terreno[5];
+                mapaResultado[fil + 2][col + 2] = sensores.terreno[6];
+                mapaResultado[fil + 2][col + 1] = sensores.terreno[7];
+                mapaResultado[fil + 2][col + 0] = sensores.terreno[8];
+                mapaResultado[fil + 0][col + 3] = sensores.terreno[9];
+                mapaResultado[fil + 1][col + 3] = sensores.terreno[10];
+                mapaResultado[fil + 2][col + 3] = sensores.terreno[11];
+                mapaResultado[fil + 3][col + 3] = sensores.terreno[12];
+                mapaResultado[fil + 3][col + 2] = sensores.terreno[13];
+                mapaResultado[fil + 3][col + 1] = sensores.terreno[14];
+                mapaResultado[fil + 3][col + 0] = sensores.terreno[15];
+            } else if (brujula == 4) {                                   //Mirando al sur
+                int k = 1;
+                for (int i = -1; i <= 1; i++) {
+                    mapaResultado[fil + 1][col - i] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -2; i <= 2; i++){
-                    mapaResultado[actual.fila+2][actual.columna-i] = sensores.terreno[k]; k++;
+                for (int i = -2; i <= 2; i++) {
+                    mapaResultado[fil + 2][col - i] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -3; i <= 3; i++){
-                    mapaResultado[actual.fila+3][actual.columna-i] = sensores.terreno[k]; k++;
+                for (int i = -3; i <= 3; i++) {
+                    mapaResultado[fil + 3][col - i] = sensores.terreno[k];
+                    k++;
                 }
-            }else if(sensores.sentido == 5){                                     //Mirando al suroeste
-                mapaResultado[actual.fila + 1][actual.columna - 0] = sensores.terreno[1];
-                mapaResultado[actual.fila + 1][actual.columna - 1] = sensores.terreno[2];
-                mapaResultado[actual.fila + 0][actual.columna - 1] = sensores.terreno[3];
-                mapaResultado[actual.fila + 2][actual.columna - 0] = sensores.terreno[4];
-                mapaResultado[actual.fila + 2][actual.columna - 1] = sensores.terreno[5];
-                mapaResultado[actual.fila + 2][actual.columna - 2] = sensores.terreno[6];
-                mapaResultado[actual.fila + 1][actual.columna - 2] = sensores.terreno[7];
-                mapaResultado[actual.fila + 0][actual.columna - 2] = sensores.terreno[8];
-                mapaResultado[actual.fila + 3][actual.columna - 0] = sensores.terreno[9];
-                mapaResultado[actual.fila + 3][actual.columna - 1] = sensores.terreno[10];
-                mapaResultado[actual.fila + 3][actual.columna - 2] = sensores.terreno[11];
-                mapaResultado[actual.fila + 3][actual.columna - 3] = sensores.terreno[12];
-                mapaResultado[actual.fila + 2][actual.columna - 3] = sensores.terreno[13];
-                mapaResultado[actual.fila + 1][actual.columna - 3] = sensores.terreno[14];
-                mapaResultado[actual.fila + 0][actual.columna - 3] = sensores.terreno[15];
+            } else if (brujula == 5) {                                     //Mirando al suroeste
+                mapaResultado[fil + 1][col - 0] = sensores.terreno[1];
+                mapaResultado[fil + 1][col - 1] = sensores.terreno[2];
+                mapaResultado[fil + 0][col - 1] = sensores.terreno[3];
+                mapaResultado[fil + 2][col - 0] = sensores.terreno[4];
+                mapaResultado[fil + 2][col - 1] = sensores.terreno[5];
+                mapaResultado[fil + 2][col - 2] = sensores.terreno[6];
+                mapaResultado[fil + 1][col - 2] = sensores.terreno[7];
+                mapaResultado[fil + 0][col - 2] = sensores.terreno[8];
+                mapaResultado[fil + 3][col - 0] = sensores.terreno[9];
+                mapaResultado[fil + 3][col - 1] = sensores.terreno[10];
+                mapaResultado[fil + 3][col - 2] = sensores.terreno[11];
+                mapaResultado[fil + 3][col - 3] = sensores.terreno[12];
+                mapaResultado[fil + 2][col - 3] = sensores.terreno[13];
+                mapaResultado[fil + 1][col - 3] = sensores.terreno[14];
+                mapaResultado[fil + 0][col - 3] = sensores.terreno[15];
 
-            } else if(sensores.sentido == 6) {                                   //Mirando al oeste
-                int k=1;
-                for(int i = -1; i <= 1; i++){
-                    mapaResultado[actual.fila-i][actual.columna-1] = sensores.terreno[k]; k++;
+            } else if (brujula == 6) {                                   //Mirando al oeste
+                int k = 1;
+                for (int i = -1; i <= 1; i++) {
+                    mapaResultado[fil - i][col - 1] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -2; i <= 2; i++){
-                    mapaResultado[actual.fila-i][actual.columna-2] = sensores.terreno[k]; k++;
+                for (int i = -2; i <= 2; i++) {
+                    mapaResultado[fil - i][col - 2] = sensores.terreno[k];
+                    k++;
                 }
-                for(int i = -3; i <= 3; i++){
-                    mapaResultado[actual.fila-i][actual.columna-3] = sensores.terreno[k]; k++;
+                for (int i = -3; i <= 3; i++) {
+                    mapaResultado[fil - i][col - 3] = sensores.terreno[k];
+                    k++;
                 }
-            }else if(sensores.sentido == 7){                                      //Mirando al noroeste
-                mapaResultado[actual.fila - 0][actual.columna - 1] = sensores.terreno[1];
-                mapaResultado[actual.fila - 1][actual.columna - 1] = sensores.terreno[2];
-                mapaResultado[actual.fila - 1][actual.columna - 0] = sensores.terreno[3];
-                mapaResultado[actual.fila - 0][actual.columna - 2] = sensores.terreno[4];
-                mapaResultado[actual.fila - 1][actual.columna - 2] = sensores.terreno[5];
-                mapaResultado[actual.fila - 2][actual.columna - 2] = sensores.terreno[6];
-                mapaResultado[actual.fila - 2][actual.columna - 1] = sensores.terreno[7];
-                mapaResultado[actual.fila - 2][actual.columna - 0] = sensores.terreno[8];
-                mapaResultado[actual.fila - 0][actual.columna - 3] = sensores.terreno[9];
-                mapaResultado[actual.fila - 1][actual.columna - 3] = sensores.terreno[10];
-                mapaResultado[actual.fila - 2][actual.columna - 3] = sensores.terreno[11];
-                mapaResultado[actual.fila - 3][actual.columna - 3] = sensores.terreno[12];
-                mapaResultado[actual.fila - 3][actual.columna - 2] = sensores.terreno[13];
-                mapaResultado[actual.fila - 3][actual.columna - 1] = sensores.terreno[14];
-                mapaResultado[actual.fila - 3][actual.columna - 0] = sensores.terreno[15];
+            } else if (brujula == 7) {                                      //Mirando al noroeste
+                mapaResultado[fil - 0][col - 1] = sensores.terreno[1];
+                mapaResultado[fil - 1][col - 1] = sensores.terreno[2];
+                mapaResultado[fil - 1][col - 0] = sensores.terreno[3];
+                mapaResultado[fil - 0][col - 2] = sensores.terreno[4];
+                mapaResultado[fil - 1][col - 2] = sensores.terreno[5];
+                mapaResultado[fil - 2][col - 2] = sensores.terreno[6];
+                mapaResultado[fil - 2][col - 1] = sensores.terreno[7];
+                mapaResultado[fil - 2][col - 0] = sensores.terreno[8];
+                mapaResultado[fil - 0][col - 3] = sensores.terreno[9];
+                mapaResultado[fil - 1][col - 3] = sensores.terreno[10];
+                mapaResultado[fil - 2][col - 3] = sensores.terreno[11];
+                mapaResultado[fil - 3][col - 3] = sensores.terreno[12];
+                mapaResultado[fil - 3][col - 2] = sensores.terreno[13];
+                mapaResultado[fil - 3][col - 1] = sensores.terreno[14];
+                mapaResultado[fil - 3][col - 0] = sensores.terreno[15];
+            }
+        }
+
+        if(sensores.nivel == 3){
+            if ((sensores.terreno[1] != 'B' && sensores.terreno[1] != 'A' && sensores.terreno[1] != 'P') ||
+                (sensores.terreno[2] != 'B' && sensores.terreno[2] != 'A' && sensores.terreno[2] != 'P') ||
+                (sensores.terreno[3] != 'B' && sensores.terreno[3] != 'A' && sensores.terreno[3] != 'P')) {
+                salirb = 0;
+                salira = 0;
+            }
+
+            for (int i = 15; i >= 0; i--) {
+                if (sensores.terreno[i] == 'X') {
+                    posBateria.first = true;
+                    posicionarObjetivo(actual, posBateria.second, i);
+                }
+                if (sensores.terreno[i] == 'K') {
+                    posBikini.first = true;
+                    posicionarObjetivo(actual, posBikini.second, i);
+                }
+                if (sensores.terreno[i] == 'D') {
+                    posZapatillas.first = true;
+                    posicionarObjetivo(actual, posZapatillas.second, i);
+                }
+            }
+
+
+            //Hacer deriverativo ir a por zapatillas si no tiene ningun objeto,
+            //Hacer deriverativo ir a una zona de carga si queda poca batería
+            //Hacer deriverativo ir a zonas no exploradas
+
+            if (!cargado && posBateria.first)
+                objetivos.push_front(posBateria.second);
+
+            if ((!actual.zapatillas && (cantB > cantA) || (!actual.zapatillas && !actual.bikini)) &&
+                ultimaAccion != actIDLE && posZapatillas.first && cantobjetos < 30)
+                objetivos.push_front(posZapatillas.second);
+
+            if ((!actual.bikini && (cantA > cantB) || (!actual.zapatillas && !actual.bikini)) && ultimaAccion != actIDLE &&
+                posBikini.first && cantobjetos < 30)
+                objetivos.push_front(posBikini.second);
+
+            if (!hayPlan && !objetivos.empty()) {
+                hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
+            }
+
+            accion = actIDLE;
+            if (hayPlan && plan.size() > 0) {   //Hay un plan no vacio
+                accion = plan.front();      //Tomo la siguiente acción del plan
+                plan.erase(plan.begin()); //Eliminamos la acción del plan
+                if (accion == actFORWARD && HayObstaculoDelante(actual)) {
+                    accion = actSEMITURN_R;
+                    hayPlan = false;
+                }
+            } else {
+                cout << "No se pudo encontrar un plan\n";
+                hayPlan = false;
+                if (!bien_situado && sensores.nivel != 3)
+                    accion = actWHEREIS;
+                else if (sensores.superficie[2] == 'a' || sensores.superficie[2] == 'l')          //Si veo aldeano o lobo
+                    accion = actTURN_R;
+                else if(((sensores.terreno[1] == 'P' || sensores.terreno[1] == 'M') && (sensores.terreno[2] != 'P' && sensores.terreno[2] != 'M')
+                        && (sensores.terreno[3] == 'P' || sensores.terreno[3] == 'M')) ||
+                        ((sensores.terreno[5] == 'P' || sensores.terreno[5] == 'M') && (sensores.terreno[6] != 'P' && sensores.terreno[6] != 'M')
+                        && (sensores.terreno[7] == 'P' || sensores.terreno[7] == 'M')) && !HayObstaculoDelante(actual)){
+                    accion = actFORWARD;
+                }else if ((sensores.terreno[3] == 'M' && sensores.terreno[7] != 'M' && sensores.terreno[13] == 'M' &&
+                             sensores.terreno[7] != 'P' && sensores.superficie[7] == '_' && sensores.terreno[2] != 'M') ||
+                            (sensores.terreno[3] == 'P' && sensores.terreno[7] != 'P' && sensores.terreno[8] != 'P'
+                             && sensores.terreno[13] == 'P' && sensores.terreno[8] != 'M' && sensores.terreno[7] != 'M' &&
+                             sensores.superficie[7] == '_' && sensores.terreno[2] != 'M') || saliendo > 0) {
+                    if (saliendo <= 1) {             //Se hará dos veces
+                        if (!HayObstaculoDelante(actual)) {
+                            accion = actFORWARD;
+                            saliendo++;
+                        } else {
+                            accion = actTURN_L;
+                            saliendo = 0;
+                        }
+                    } else if (saliendo == 2) {
+                        accion = actTURN_R;
+                        saliendo = 0;
+                    }
+                } else if ((sensores.terreno[1] == 'M' && sensores.terreno[5] != 'M' && sensores.terreno[11] == 'M' &&
+                            sensores.terreno[5] != 'P' && sensores.superficie[5] == '_' && sensores.terreno[2] != 'M') ||
+                           (sensores.terreno[1] == 'P' && sensores.terreno[5] != 'P' && sensores.terreno[4] != 'P'
+                            && sensores.terreno[11] == 'P' && sensores.terreno[5] != 'M' && sensores.terreno[4] != 'M'
+                            && sensores.superficie[5] == '_' && sensores.terreno[2] != 'M') || saliendo1 > 0) {
+                    if (saliendo1 <= 1) {             //Se hará dos veces
+                        if (!HayObstaculoDelante(actual)) {
+                            accion = actFORWARD;
+                            saliendo1++;
+                        } else {
+                            saliendo1 = 0;
+                            accion = actTURN_R;
+                        }
+                    } else if (saliendo1 == 2) {
+                        accion = actTURN_L;
+                        saliendo1 = 0;
+                    }
+                } else if (!cargado && sensores.terreno[0] == 'X') {
+                    accion = actIDLE;
+                } else if ((((sensores.terreno[0] == 'B' && !actual.zapatillas) ||
+                             (sensores.terreno[0] == 'A' && !actual.bikini)) &&
+                            //Para salir de zonas rodeadas de agua/bosque y en su campo
+                            (sensores.terreno[12] != 'B' && sensores.terreno[12] != 'A') &&
+                            //enfrente hay zona que no es agua o bosque
+                            (sensores.terreno[2] == 'B' || sensores.terreno[2] == 'A'))
+                           || (sensores.terreno[2] == 'B' && sensores.terreno[1] == 'B' && sensores.terreno[3] == 'B' &&
+                               sensores.terreno[0] == 'K' && !actual.zapatillas) && sensores.superficie[2] == '_' &&
+                              sensores.terreno[2] != 'M' && sensores.terreno[2] != 'P') {
+                    accion = actFORWARD;
+                } else if ((sensores.terreno[2] == 'B' && sensores.terreno[3] == 'B' && sensores.terreno[1] == 'B' &&
+                            !actual.zapatillas)) {
+                    if (salirb == 0) {
+                        accion = actTURN_R;
+                        salirb++;
+                    } else if (sensores.terreno[2] != 'M' && sensores.superficie[2] == '_' && sensores.terreno[2] != 'P')
+                        accion = actFORWARD;
+                    else
+                        accion = actTURN_R;
+
+                } else if ((sensores.terreno[2] == 'A' && sensores.terreno[3] == 'A' && sensores.terreno[1] == 'A' &&
+                            !actual.bikini)) {
+                    if (salira <= 1) {
+                        accion = actTURN_R;
+                        salira++;
+                    } else if (sensores.terreno[2] != 'M' && sensores.superficie[2] == '_' && sensores.terreno[2] != 'P')
+                        accion = actFORWARD;
+                    else
+                        accion = actTURN_R;
+
+                } else if (sensores.terreno[6] == 'B' && sensores.terreno[3] == 'B' && sensores.terreno[1] != 'B') {
+                    accion = actTURN_R;
+                } else if (avanzadas >= n_avanzadas || sensores.terreno[2] == 'P' || sensores.terreno[2] == 'M' ||
+                           (sensores.terreno[2] == 'A' && !actual.bikini) ||
+                           (sensores.terreno[2] == 'B' && !actual.zapatillas)) {
+                    avanzadas = 0;
+
+                    if (girar == 0)
+                        accion = actSEMITURN_R;
+                    else if (girar == 1)
+                        accion = actTURN_R;
+                    else if (girar == 2)
+                        accion = actSEMITURN_L;
+                    else
+                        accion = actTURN_L;
+
+                } else if (((sensores.terreno[2] == 'T' || sensores.terreno[2] == 'S' || sensores.terreno[2] == 'G' ||
+                             sensores.terreno[2] == 'D' || sensores.terreno[2] == 'K' || sensores.terreno[2] == 'X' ||
+                             (sensores.terreno[2] == 'B' && actual.zapatillas) ||
+                             (sensores.terreno[2] == 'A' && actual.bikini) || (sensores.terreno[2] == 'D' && cantobjetos < 30))
+                            && sensores.superficie[2] == '_' && sensores.terreno[2] != 'P')) {
+                    accion = actFORWARD;
+                    avanzadas++;
+                }
+            }
+        }else if(sensores.nivel == 4){
+            actual.fila = fil; actual.columna = col; actual.orientacion = brujula;
+            if(inicio_ronda){
+                objetivosSeguidos.clear();
+                objetivosSeguidos = objetivos;
+                inicio_ronda = false;
+            }
+
+            if(objetivosSeguidos.front().fila == actual.fila && objetivosSeguidos.front().columna == actual.columna && !objetivosV[0]){
+                objetivosSeguidos.erase(objetivosSeguidos.begin());
+                plan.clear();
+                hayPlan = false;
+                objetivosV[0] = true;
+            }
+
+            if(objetivos.front().fila == actual.fila && objetivos.front().columna == actual.columna && !objetivosV[0]){
+                objetivos.erase(objetivos.begin());
+                plan.clear();
+                hayPlan = false;
+                objetivosV[0] = true;
+            }
+
+            if (plan.empty() && bien_situado) {
+                hayPlan = pathFinding(sensores.nivel, actual, objetivosSeguidos, plan);
+            }
+
+            accion = actIDLE;
+            if (hayPlan && plan.size() > 0) {   //Hay un plan no vacio
+                accion = plan.front();      //Tomo la siguiente acción del plan
+                plan.erase(plan.begin()); //Eliminamos la acción del plan
+                if (accion == actFORWARD && HayObstaculoDelante(actual)) {
+                    hayPlan = false;
+                    plan.clear();
+                    accion = actIDLE;
+                }
+            } else {
+                cout << "No se pudo encontrar un plan\n";
+                hayPlan = false;
+                plan.clear();
+                if(!bien_situado){
+                    accion = actWHEREIS;
+                }else
+                    accion = actTURN_R;
             }
         }
     }
+    cantA = calcularCantidadCasilla('A');
+    cantB = calcularCantidadCasilla('B');
 
-    if(inicio_partida){
-        int tam = mapaResultado.size();
-        for(int i = 0; i < tam; i++){                                   //Rellenará el mapaResultado de precipios,
-            for(int j = 0; j < tam; j++){                               //ya que es una mapa cerrado, según lo indicado
-                if(i <= 2 || i >= tam-3 || j <= 2 || j >= tam-3){       // en el guión
-                    mapaResultado[i][j] = 'P';
-                }
-            }
-        }
-        //accion = actWHEREIS;
-        inicio_partida = false;
-    }
     ultimaAccion = accion;
+    cout << "FIL: " << actual.fila << " COL: " << actual.columna << endl;
+    cout << "FILO: " << objetivosSeguidos.front().fila << " COLO: " << objetivosSeguidos.front().columna << endl;
+    cout << "Accion: " << accion << endl;
     return accion;
 }
 
@@ -219,18 +553,19 @@ bool ComportamientoJugador::pathFinding(int level, const estado &origen, const l
 		// Incluir aqui la llamada al busqueda de costo uniforme/A*
         un_objetivo = objetivos.front();
         cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
-        return pathFinding_costeUniforme(origen, un_objetivo, plan);
+        return pathFinding_algEstrella(origen, un_objetivo, plan);
 		break;
 	case 3:
 		cout << "Reto 1: Descubrir el mapa\n";
-
-        return pathFinding_reactivoDeriverativo(origen, un_objetivo, plan);
-		cout << "No implementado aun\n";
+        un_objetivo = objetivos.front();
+        cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
+        return pathFinding_algEstrella(origen, un_objetivo, plan);
 		break;
 	case 4:
 		cout << "Reto 2: Maximizar objetivos\n";
-		// Incluir aqui la llamada al algoritmo de busqueda para el Reto 2
-		cout << "No implementado aun\n";
+        un_objetivo = objetivos.front();
+        cout << "fila: " << un_objetivo.fila << " col:" << un_objetivo.columna << endl;
+        return pathFinding_algEstrella(origen, un_objetivo, plan);
 		break;
 	}
 	return false;
@@ -622,6 +957,8 @@ bool ComportamientoJugador::pathFinding_Anchura(const estado &origen, const esta
 
     return false;
 }
+
+
 //Calcular el coste de un movimiento
 //coste para moverse a una celda
 void ComportamientoJugador::coste (nodo &n, Action act){
@@ -673,21 +1010,21 @@ void ComportamientoJugador::coste (nodo &n, Action act){
     n.coste = coste;
 }
 
-//Comparar estados para el nivel 2
-//Ya que depende del coste
+//Compara estados para nivel 2
 struct ComparaEstados2{
     bool operator()(const estado &a, const estado &n) const
     {
         if ((a.fila > n.fila) or (a.fila == n.fila and a.columna > n.columna) or
             (a.fila == n.fila and a.columna == n.columna and a.orientacion > n.orientacion) or
             (a.fila == n.fila && a.columna == n.columna && a.orientacion == n.orientacion && a.bikini > n.bikini) or
-            (a.fila == n.fila && a.columna == n.columna && a.orientacion == n.orientacion && a.zapatillas > n.zapatillas))
+            (a.fila == n.fila && a.columna == n.columna && a.orientacion == n.orientacion && a.bikini == n.bikini && a.zapatillas > n.zapatillas))
             return true;
         else
             return false;
     }
 };
-//Nivel 2 costeUniforme
+
+//Nivel costeUniforme
 bool ComportamientoJugador::pathFinding_costeUniforme(const estado &origen, const estado &destino, list<Action> &plan) {
     // Borro la lista
     cout << "Calculando plan\n";
@@ -713,16 +1050,14 @@ bool ComportamientoJugador::pathFinding_costeUniforme(const estado &origen, cons
         Abiertos.pop();
         Cerrados.insert(current.st);
 
-        if(mapaResultado[current.st.fila][current.st.fila] == 'D'){
-            current.st.zapatillas = true;
-            if(current.st.bikini)
-                current.st.bikini = false;
+        if(mapaResultado[current.st.fila][current.st.columna] == 'D'){
+           current.st.zapatillas = true;
+           current.st.bikini = false;
         }
 
-        if(mapaResultado[current.st.fila][current.st.fila] == 'K'){
+        if(mapaResultado[current.st.fila][current.st.columna] == 'K'){
             current.st.bikini = true;
-            if(current.st.zapatillas)
-                current.st.zapatillas = false;
+            current.st.zapatillas = false;
         }
 
         // Generar descendiente de girar a la derecha 90 grados
@@ -813,17 +1148,306 @@ bool ComportamientoJugador::pathFinding_costeUniforme(const estado &origen, cons
 
     return false;
 }
-bool ComportamientoJugador::pathFinding_reactivoDeriverativo(const estado &origen, const estado &destino, list<Action> &plan) {
 
+void ComportamientoJugador::posicionarObjetivo(const estado actual, estado &objetivo, int pos){
+    //Por defecto
+    objetivo.fila = actual.fila;
+    objetivo.columna = objetivo.columna;
+
+    if(actual.orientacion == 0){        //Norte
+        if(pos == 1){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-1;}
+        else if(pos == 2){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna;}
+        else if(pos == 3){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+1;}
+        else if(pos == 4){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-2;}
+        else if(pos == 5){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-1;}
+        else if(pos == 6){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna;}
+        else if(pos == 7){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+1;}
+        else if(pos == 8){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+2;}
+        else if(pos == 9){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-3;}
+        else if(pos == 10){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-2;}
+        else if(pos == 11){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-1;}
+        else if(pos == 12){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna;}
+        else if(pos == 13){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+1;}
+        else if(pos == 14){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+2;}
+        else if(pos == 15){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+3;}
+    }else if(actual.orientacion == 1){      //Noreste
+        if(pos == 1){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna;}
+        else if(pos == 2){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+1;}
+        else if(pos == 3){objetivo.fila = actual.fila; objetivo.columna=actual.columna+1;}
+        else if(pos == 4){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna;}
+        else if(pos == 5){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+1;}
+        else if(pos == 6){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+2;}
+        else if(pos == 7){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+2;}
+        else if(pos == 8){objetivo.fila = actual.fila; objetivo.columna=actual.columna+2;}
+        else if(pos == 9){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna;}
+        else if(pos == 10){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+1;}
+        else if(pos == 11){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+2;}
+        else if(pos == 12){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+3;}
+        else if(pos == 13){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+3;}
+        else if(pos == 14){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+3;}
+        else if(pos == 15){objetivo.fila = actual.fila; objetivo.columna=actual.columna+3;}
+    }else if(actual.orientacion == 2){      //Este
+        if(pos == 1){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+1;}
+        else if(pos == 2){objetivo.fila = actual.fila; objetivo.columna=actual.columna+1;}
+        else if(pos == 3){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+1;}
+        else if(pos == 4){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+2;}
+        else if(pos == 5){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+2;}
+        else if(pos == 6){objetivo.fila = actual.fila; objetivo.columna=actual.columna+2;}
+        else if(pos == 7){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+2;}
+        else if(pos == 8){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+2;}
+        else if(pos == 9){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna+3;}
+        else if(pos == 10){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna+3;}
+        else if(pos == 11){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna+3;}
+        else if(pos == 12){objetivo.fila = actual.fila; objetivo.columna=actual.columna+3;}
+        else if(pos == 13){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+3;}
+        else if(pos == 14){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+3;}
+        else if(pos == 15){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+3;}
+    }else if(actual.orientacion == 3){      //Sureste
+        if(pos == 1){objetivo.fila = actual.fila; objetivo.columna=actual.columna+1;}
+        else if(pos == 2){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+1;}
+        else if(pos == 3){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna;}
+        else if(pos == 4){objetivo.fila = actual.fila; objetivo.columna=actual.columna+2;}
+        else if(pos == 5){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+2;}
+        else if(pos == 6){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+2;}
+        else if(pos == 7){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+1;}
+        else if(pos == 8){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna;}
+        else if(pos == 9){objetivo.fila = actual.fila; objetivo.columna=actual.columna+3;}
+        else if(pos == 10){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+3;}
+        else if(pos == 11){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+3;}
+        else if(pos == 12){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+3;}
+        else if(pos == 13){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+2;}
+        else if(pos == 14){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+1;}
+        else if(pos == 15){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna;}
+    }else if(actual.orientacion == 4){      //Sur
+        if(pos == 1){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna+1;}
+        else if(pos == 2){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna;}
+        else if(pos == 3){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-1;}
+        else if(pos == 4){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+2;}
+        else if(pos == 5){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna+1;}
+        else if(pos == 6){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna;}
+        else if(pos == 7){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-1;}
+        else if(pos == 8){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-2;}
+        else if(pos == 9){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+3;}
+        else if(pos == 10){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+2;}
+        else if(pos == 11){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna+1;}
+        else if(pos == 12){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna;}
+        else if(pos == 13){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-1;}
+        else if(pos == 14){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-2;}
+        else if(pos == 15){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-3;}
+    }else if(actual.orientacion == 5){      //Suroeste
+        if(pos == 1){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna;}
+        else if(pos == 2){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-1;}
+        else if(pos == 3){objetivo.fila = actual.fila; objetivo.columna=actual.columna-1;}
+        else if(pos == 4){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna;}
+        else if(pos == 5){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-1;}
+        else if(pos == 6){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-2;}
+        else if(pos == 7){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-2;}
+        else if(pos == 8){objetivo.fila = actual.fila; objetivo.columna=actual.columna-2;}
+        else if(pos == 9){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna;}
+        else if(pos == 10){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-1;}
+        else if(pos == 11){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-2;}
+        else if(pos == 12){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-3;}
+        else if(pos == 13){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-3;}
+        else if(pos == 14){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-3;}
+        else if(pos == 15){objetivo.fila = actual.fila; objetivo.columna=actual.columna-3;}
+    }else if(actual.orientacion == 6){      //Oeste
+        if(pos == 1){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-1;}
+        else if(pos == 2){objetivo.fila = actual.fila; objetivo.columna=actual.columna-1;}
+        else if(pos == 3){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-1;}
+        else if(pos == 4){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-2;}
+        else if(pos == 5){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-2;}
+        else if(pos == 6){objetivo.fila = actual.fila; objetivo.columna=actual.columna-2;}
+        else if(pos == 7){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-2;}
+        else if(pos == 8){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-2;}
+        else if(pos == 9){objetivo.fila = actual.fila+3; objetivo.columna=actual.columna-3;}
+        else if(pos == 10){objetivo.fila = actual.fila+2; objetivo.columna=actual.columna-3;}
+        else if(pos == 11){objetivo.fila = actual.fila+1; objetivo.columna=actual.columna-3;}
+        else if(pos == 12){objetivo.fila = actual.fila; objetivo.columna=actual.columna-3;}
+        else if(pos == 13){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-3;}
+        else if(pos == 14){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-3;}
+        else if(pos == 15){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-3;}
+    }else if(actual.orientacion == 7){      //Noroeste
+        if(pos == 1){objetivo.fila = actual.fila; objetivo.columna=actual.columna-1;}
+        else if(pos == 2){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-1;}
+        else if(pos == 3){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna;}
+        else if(pos == 4){objetivo.fila = actual.fila; objetivo.columna=actual.columna-2;}
+        else if(pos == 5){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-2;}
+        else if(pos == 6){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-2;}
+        else if(pos == 7){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-1;}
+        else if(pos == 8){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna;}
+        else if(pos == 9){objetivo.fila = actual.fila; objetivo.columna=actual.columna-3;}
+        else if(pos == 10){objetivo.fila = actual.fila-1; objetivo.columna=actual.columna-3;}
+        else if(pos == 11){objetivo.fila = actual.fila-2; objetivo.columna=actual.columna-3;}
+        else if(pos == 12){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-3;}
+        else if(pos == 13){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-2;}
+        else if(pos == 14){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna-1;}
+        else if(pos == 15){objetivo.fila = actual.fila-3; objetivo.columna=actual.columna;}
+    }
+
+}
+
+int ComportamientoJugador::calcularCantidadCasilla(unsigned char casilla) {
+    int tam = mapaResultado.size();
+    int cantidad = 0;
+    for(int i = 0; i < tam; i++){
+        for(int j = 0; j < tam; j++){
+            if(mapaResultado[i][j] == casilla)
+                cantidad++;
+        }
+    }
+    return cantidad;
+}
+
+double ComportamientoJugador::distancia(const estado &origen, const estado &destino) {
+    //return abs(origen.fila-destino.fila) + abs(origen.columna-destino.columna);           //Manhattan
+    return sqrt(pow(origen.fila - destino.fila, 2) + pow(origen.columna - destino.columna, 2)); //Euclidiana
+}
+
+int ComportamientoJugador::mejordistancia(const estado &origen, const pair<bool, estado> *destino) {
+    int valor = 999999;
+    for(int i = 0; i < n_destinos; i++){
+        if(!destino[i].first && valor > distancia(origen, destino[i].second))
+            valor = distancia(origen, destino[i].second);
+    }
+    return valor;
+}
+
+bool ComportamientoJugador::pathFinding_algEstrella(const estado &origen, const estado &destino, list<Action> &plan) {
+    // Borro la lista
+    cout << "Calculando plan\n";
+    plan.clear();
+    set<estado, ComparaEstados2> Cerrados; // Lista de Cerrados
+    priority_queue<nodo> Abiertos;		   // Lista de Abiertos
 
     nodo current;
     current.st = origen;
     current.secuencia.empty();
 
+    //Inicialización de datos
+    current.st.zapatillas = false;
+    current.st.bikini = false;
+    coste(current, actIDLE);
+    current.valora = current.coste + distancia(current.st, destino);
+
+    Abiertos.push(current);
+
+    while (!Abiertos.empty() and (current.st.fila != destino.fila or current.st.columna != destino.columna))
+    {
+        if(mapaResultado[current.st.fila][current.st.columna] == 'D'){
+            current.st.zapatillas = true;
+            current.st.bikini = false;
+        }
+
+        if(mapaResultado[current.st.fila][current.st.columna] == 'K'){
+            current.st.bikini = true;
+            current.st.zapatillas = false;
+        }
+
+        Abiertos.pop();
+        Cerrados.insert(current.st);
+
+        // Generar descendiente de girar a la derecha 90 grados
+        nodo hijoTurnR = current;
+        hijoTurnR.st.orientacion = (hijoTurnR.st.orientacion + 2) % 8;
+
+
+        if (Cerrados.find(hijoTurnR.st) == Cerrados.end())
+        {
+            coste(hijoTurnR, actTURN_R);
+            hijoTurnR.coste = hijoTurnR.coste + current.coste;
+            hijoTurnR.valora = hijoTurnR.coste;
+            hijoTurnR.valora += distancia(hijoTurnR.st, destino);
+            hijoTurnR.secuencia.push_back(actTURN_R);
+            Abiertos.push(hijoTurnR);
+        }
+
+        // Generar descendiente de girar a la derecha 45 grados
+        nodo hijoSEMITurnR = current;
+        hijoSEMITurnR.st.orientacion = (hijoSEMITurnR.st.orientacion + 1) % 8;
+
+        if (Cerrados.find(hijoSEMITurnR.st) == Cerrados.end())
+        {
+            coste(hijoSEMITurnR, actSEMITURN_R);
+            hijoSEMITurnR.coste = hijoSEMITurnR.coste + current.coste;
+            hijoSEMITurnR.valora = hijoSEMITurnR.coste;
+            hijoSEMITurnR.valora += distancia(hijoSEMITurnR.st, destino);
+            hijoSEMITurnR.secuencia.push_back(actSEMITURN_R);
+            Abiertos.push(hijoSEMITurnR);
+        }
+
+        // Generar descendiente de girar a la izquierda 90 grados
+        nodo hijoTurnL = current;
+        hijoTurnL.st.orientacion = (hijoTurnL.st.orientacion + 6) % 8;
+        if (Cerrados.find(hijoTurnL.st) == Cerrados.end())
+        {
+            coste(hijoTurnL, actTURN_L);
+            hijoTurnL.coste = hijoTurnL.coste + current.coste;
+            hijoTurnL.valora = hijoTurnL.coste;
+            hijoTurnL.valora += distancia(hijoTurnL.st, destino);
+            hijoTurnL.secuencia.push_back(actTURN_L);
+            Abiertos.push(hijoTurnL);
+        }
+
+        // Generar descendiente de girar a la izquierda 45 grados
+        nodo hijoSEMITurnL = current;
+        hijoSEMITurnL.st.orientacion = (hijoSEMITurnL.st.orientacion + 7) % 8;
+
+        if (Cerrados.find(hijoSEMITurnL.st) == Cerrados.end())
+        {
+            coste(hijoSEMITurnL, actSEMITURN_L);
+            hijoSEMITurnL.coste = hijoSEMITurnL.coste + current.coste;
+            hijoSEMITurnL.valora = hijoSEMITurnL.coste;
+            hijoSEMITurnL.valora += distancia(hijoSEMITurnL.st, destino);
+            hijoSEMITurnL.secuencia.push_back(actSEMITURN_L);
+            Abiertos.push(hijoSEMITurnL);
+        }
+
+        // Generar descendiente de avanzar
+        nodo hijoForward = current;
+
+        if (!HayObstaculoDelante(hijoForward.st))
+        {
+            if (Cerrados.find(hijoForward.st) == Cerrados.end())
+            {
+                coste(hijoForward, actFORWARD);
+                hijoForward.coste = hijoForward.coste + current.coste;
+                hijoForward.valora = hijoForward.coste;
+                hijoForward.valora += distancia(hijoForward.st, destino);
+                hijoForward.secuencia.push_back(actFORWARD);
+                Abiertos.push(hijoForward);
+            }
+        }
+
+        // Tomo el siguiente valor de la Abiertos
+        if (!Abiertos.empty())
+        {
+            current = Abiertos.top();
+        }
+    }
+
+    cout << "Terminada la busqueda\n";
+
+    if (current.st.fila == destino.fila and current.st.columna == destino.columna)
+    {
+        cout << "Cargando el plan\n";
+        plan = current.secuencia;
+        cout << "Longitud del plan: " << plan.size() << endl;
+        PintaPlan(plan);
+        // ver el plan en el mapa
+        VisualizaPlan(origen, plan);
+        return true;
+    }
+    else
+    {
+        cout << "No encontrado plan\n";
+    }
+
     return false;
-
-
 }
+
+
+
+
 int ComportamientoJugador::interact(Action accion, int valor)
 {
 	return false;
