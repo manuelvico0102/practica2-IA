@@ -11,6 +11,7 @@ struct estado {
   int orientacion;
   bool bikini;
   bool zapatillas;
+  double distancia;
 };
 
 struct nodo
@@ -44,14 +45,13 @@ class ComportamientoJugador : public Comportamiento {
       posBateria.first = false;
       n_destinos = 3;
       cantobjetos = 0;
-      dist = 0;
-      distmin = 100000;
-      objetivosV[0] = objetivosV[1] = objetivosV[3] = false;
-      inicio_ronda = true;
+      posBateria.first = false;
+      objPersonalizado.first = false;
+      enCaminoBateria = false;
+      zapatillas = bikini = false;
     }
     ComportamientoJugador(std::vector< std::vector< unsigned char> > mapaR) : Comportamiento(mapaR) {
       // Inicializar Variables de Estado
-      hayPlan = false;
       inicio_partida = true;
       ultimaAccion = actIDLE;
       bien_situado = false;
@@ -65,10 +65,8 @@ class ComportamientoJugador : public Comportamiento {
       posBateria.first = false;
       n_destinos = 3;
       cantobjetos = 0;
-      dist = 0;
-      distmin = 100000;
-      objetivosV[0] = objetivosV[1] = objetivosV[3] = false;
-      inicio_ronda = true;
+      enCaminoBateria = false;
+      zapatillas = bikini = false;
     }
     ComportamientoJugador(const ComportamientoJugador & comport) : Comportamiento(comport){}
     ~ComportamientoJugador(){}
@@ -95,16 +93,15 @@ class ComportamientoJugador : public Comportamiento {
     pair<bool,estado> posBateria;
     pair<bool, estado> posZapatillas;
     pair<bool, estado> posBikini;
-    bool objetivosV[3];
-    pair<bool,estado> aux;
-    estado objPersonalizado;
+    vector<estado> objetivosV;
+    pair<bool,estado> objPersonalizado;
     int saliendo, saliendo1, salira, salirb;
     int cantA, cantB;
     int n_destinos;
     int cantobjetos;
-    double dist, distmin;
-    bool inicio_ronda;
     list<estado> objetivosSeguidos;
+    bool enCaminoBateria;
+    bool zapatillas, bikini;
 
     // Métodos privados de la clase
     bool pathFinding(int level, const estado &origen, const list<estado> &destino, list<Action> &plan);
@@ -120,7 +117,9 @@ class ComportamientoJugador : public Comportamiento {
     void posicionarObjetivo(const estado actual, estado &objetivo, int pos);
     int calcularCantidadCasilla(unsigned char casilla);
     double distancia(const estado &origen, const estado &destino);
-    int mejordistancia(const estado &origen, const pair<bool,estado> destino[3]);
+    bool encontrado(const estado obj);
+    bool objetivoEnVision(const estado objetivo);
+
 
 };
 

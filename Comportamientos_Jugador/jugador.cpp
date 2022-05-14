@@ -7,10 +7,17 @@
 #include <stack>
 #include <queue>
 #include <stdlib.h>
+#include <algorithm>
 
 // Este es el método principal que se piden en la practica.
 // Tiene como entrada la información de los sensores y devuelve la acción a realizar.
 // Para ver los distintos sensores mirar fichero "comportamiento.hpp"
+
+bool compare_nocase (const estado& first, const estado& second)
+{
+    return ( first.distancia < second.distancia );
+}
+
 Action ComportamientoJugador::think(Sensores sensores)
 {
 	actual.fila = sensores.posF;
@@ -25,12 +32,18 @@ Action ComportamientoJugador::think(Sensores sensores)
 
     n_destinos = sensores.num_destinos;
     cout << "sensores.num_destinos : " << sensores.num_destinos << endl;
+
+    if(objetivosV.size() == 3)
+        objetivosV.clear();
+
     objetivos.clear();
     for (int i = 0; i < sensores.num_destinos; i++) {
         estado aux;
         aux.fila = sensores.destino[2 * i];
         aux.columna = sensores.destino[2 * i + 1];
-        objetivos.push_back(aux);
+        if(!encontrado(aux))
+            objetivos.push_back(aux);
+        //Tengo que ordenarlo aqui, si lo he encontrado no lo meto, y tengo que ordenarlo segun la distancia de euclides.
     }
 
     if(sensores.nivel <= 2) {
@@ -64,16 +77,16 @@ Action ComportamientoJugador::think(Sensores sensores)
 
             if (mapaResultado.size() <= 30) {
                 n_avanzadas = 5;
-                cant_bateria = 1000;
+                cant_bateria = 900;
             } else if (mapaResultado.size() > 30 && mapaResultado.size() <= 50) {
                 n_avanzadas = 15;
-                cant_bateria = 500;
+                cant_bateria = 900;
             } else if (mapaResultado.size() > 50 && mapaResultado.size() <= 75) {
                 n_avanzadas = 20;
-                cant_bateria = 500;
+                cant_bateria = 1100;
             } else if (mapaResultado.size() > 75 && mapaResultado.size() <= 100) {
                 n_avanzadas = 20;
-                cant_bateria = 500;
+                cant_bateria = 1100;
             }
             ultimaAccion = actIDLE;
             inicio_partida = false;
@@ -116,7 +129,7 @@ Action ComportamientoJugador::think(Sensores sensores)
 
                 //Actualizo en cada momento el estado de la carga
                 cargado = false;
-                if (sensores.bateria >= 900)
+                if (sensores.bateria >= cant_bateria)
                     cargado = true;
 
                 break;
@@ -126,7 +139,7 @@ Action ComportamientoJugador::think(Sensores sensores)
                 girar = rand() % 4;
 
                 cargado = false;
-                if (sensores.bateria >= 900)
+                if (sensores.bateria >= cant_bateria)
                     cargado = true;
 
                 break;
@@ -136,7 +149,7 @@ Action ComportamientoJugador::think(Sensores sensores)
                 girar = rand() % 4;
 
                 cargado = false;
-                if (sensores.bateria >= 900)
+                if (sensores.bateria >= cant_bateria)
                     cargado = true;
 
                 break;
@@ -146,7 +159,7 @@ Action ComportamientoJugador::think(Sensores sensores)
                 girar = rand() % 4;
 
                 cargado = false;
-                if (sensores.bateria >= 900)
+                if (sensores.bateria >= cant_bateria)
                     cargado = true;
                 break;
 
@@ -155,7 +168,7 @@ Action ComportamientoJugador::think(Sensores sensores)
                 girar = rand() % 4;
 
                 cargado = false;
-                if (sensores.bateria >= 900)
+                if (sensores.bateria >= cant_bateria)
                     cargado = true;
 
                 break;
@@ -170,20 +183,22 @@ Action ComportamientoJugador::think(Sensores sensores)
 
 
         if (sensores.terreno[0] == 'D') {
-            actual.zapatillas = true;
-            actual.bikini = false;
+            actual.zapatillas = zapatillas = true;
+            actual.bikini = bikini = false;
             cantobjetos++;
         }
 
         if (sensores.terreno[0] == 'K') {
-            actual.bikini = true;
-            actual.zapatillas = false;
+            actual.bikini = bikini = true;
+            actual.zapatillas= zapatillas = false;
             cantobjetos++;
         }
 
-        if (sensores.reset || sensores.colision)
+        if (sensores.reset || sensores.colision) {
             bien_situado = false;
-
+            hayPlan = false;
+            plan.clear();
+        }
         if (ultimaAccion == actWHEREIS || sensores.nivel == 3) {
             bien_situado = true;
             fil = sensores.posF;
@@ -329,6 +344,7 @@ Action ComportamientoJugador::think(Sensores sensores)
             for (int i = 15; i >= 0; i--) {
                 if (sensores.terreno[i] == 'X') {
                     posBateria.first = true;
+                    objPersonalizado.first = true;
                     posicionarObjetivo(actual, posBateria.second, i);
                 }
                 if (sensores.terreno[i] == 'K') {
@@ -342,20 +358,16 @@ Action ComportamientoJugador::think(Sensores sensores)
             }
 
 
-            //Hacer deriverativo ir a por zapatillas si no tiene ningun objeto,
-            //Hacer deriverativo ir a una zona de carga si queda poca batería
-            //Hacer deriverativo ir a zonas no exploradas
-
             if (!cargado && posBateria.first)
                 objetivos.push_front(posBateria.second);
 
             if ((!actual.zapatillas && (cantB > cantA) || (!actual.zapatillas && !actual.bikini)) &&
                 ultimaAccion != actIDLE && posZapatillas.first && cantobjetos < 30)
-                objetivos.push_front(posZapatillas.second);
+                objetivos.push_back(posZapatillas.second);
 
             if ((!actual.bikini && (cantA > cantB) || (!actual.zapatillas && !actual.bikini)) && ultimaAccion != actIDLE &&
                 posBikini.first && cantobjetos < 30)
-                objetivos.push_front(posBikini.second);
+                objetivos.push_back(posBikini.second);
 
             if (!hayPlan && !objetivos.empty()) {
                 hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
@@ -474,47 +486,82 @@ Action ComportamientoJugador::think(Sensores sensores)
             }
         }else if(sensores.nivel == 4){
             actual.fila = fil; actual.columna = col; actual.orientacion = brujula;
-            if(inicio_ronda){
-                objetivosSeguidos.clear();
-                objetivosSeguidos = objetivos;
-                inicio_ronda = false;
+            for(auto it = objetivos.begin(); it != objetivos.end(); ++it){
+                it->distancia = distancia(actual, *it);
             }
+            objetivos.sort(compare_nocase);
 
-            if(objetivosSeguidos.front().fila == actual.fila && objetivosSeguidos.front().columna == actual.columna && !objetivosV[0]){
-                objetivosSeguidos.erase(objetivosSeguidos.begin());
-                plan.clear();
-                hayPlan = false;
-                objetivosV[0] = true;
-            }
-
-            if(objetivos.front().fila == actual.fila && objetivos.front().columna == actual.columna && !objetivosV[0]){
+            if(objetivos.front().fila == actual.fila && objetivos.front().columna == actual.columna){
+                objetivosV.push_back(objetivos.front());
                 objetivos.erase(objetivos.begin());
                 plan.clear();
                 hayPlan = false;
-                objetivosV[0] = true;
+            }
+            for (int i = 15; i >= 0; i--) {
+                if (sensores.terreno[i] == 'X') {
+                    posBateria.first = true;
+                    objPersonalizado.first = true;
+                    posicionarObjetivo(actual, posBateria.second, i);
+                }
             }
 
-            if (plan.empty() && bien_situado) {
-                hayPlan = pathFinding(sensores.nivel, actual, objetivosSeguidos, plan);
+            if (!cargado && posBateria.first && !enCaminoBateria) {
+                plan.clear();
+                hayPlan = pathFinding_algEstrella(actual, posBateria.second, plan);
+                if(hayPlan)
+                    enCaminoBateria = true;
+            }
+
+
+            if ((cargado || (!cargado && !posBateria.first)) && plan.empty() && bien_situado && !objetivos.empty()) {
+                plan.clear();
+                hayPlan = pathFinding(sensores.nivel, actual, objetivos, plan);
             }
 
             accion = actIDLE;
-            if (hayPlan && plan.size() > 0) {   //Hay un plan no vacio
+            if(sensores.superficie[2] != '_' && saliendo < 3){
+                enCaminoBateria = false;
+                if(saliendo == 0) {
+                    accion = actTURN_R;
+                    saliendo++;
+                }else if(saliendo == 1){
+                    if(!HayObstaculoDelante(actual))
+                        accion = actFORWARD;
+                    saliendo++;
+                }else {
+                    accion = actTURN_L;
+                    saliendo = 0;
+                }
+            }else if (!cargado && sensores.terreno[0] == 'X') {
+                accion = actIDLE;
+                enCaminoBateria = false;
+            }else if (hayPlan && plan.size() > 0) {   //Hay un plan no vacio
                 accion = plan.front();      //Tomo la siguiente acción del plan
-                plan.erase(plan.begin()); //Eliminamos la acción del plan
-                if (accion == actFORWARD && HayObstaculoDelante(actual)) {
+                if(!sensores.colision)
+                    plan.erase(plan.begin()); //Eliminamos la acción del plan
+                if ((accion == actFORWARD && (HayObstaculoDelante(actual) ||
+                    (sensores.terreno[2] == 'B' && !actual.zapatillas && (sensores.terreno[0] != 'B' && sensores.terreno[0] != 'K' && sensores.terreno[0] != 'X') &&
+                    (!objetivoEnVision(objetivos.front()) && !objetivoEnVision(posBateria.second))) ||
+                    (sensores.terreno[2] == 'A' && !actual.bikini && (sensores.terreno[0] != 'A' && sensores.terreno[0] != 'K' && sensores.terreno[0] != 'X')
+                    && (!objetivoEnVision(objetivos.front()) && !objetivoEnVision(posBateria.second)))))) {      //Si sensores 0 es B estoy en bosque entonces si avanzo
                     hayPlan = false;
                     plan.clear();
-                    accion = actIDLE;
+                    enCaminoBateria = false;
+                    accion = actTURN_R;
                 }
             } else {
                 cout << "No se pudo encontrar un plan\n";
                 hayPlan = false;
                 plan.clear();
-                if(!bien_situado){
+                enCaminoBateria = false;
+                if (!bien_situado) {
                     accion = actWHEREIS;
-                }else
-                    accion = actTURN_R;
+                }else if(HayObstaculoDelante(actual)){
+                    accion = actSEMITURN_R;
+                }else if(!HayObstaculoDelante(actual) && sensores.superficie[2] == '_'){
+                    accion = actFORWARD;
+                }
+
             }
         }
     }
@@ -523,8 +570,6 @@ Action ComportamientoJugador::think(Sensores sensores)
 
     ultimaAccion = accion;
     cout << "FIL: " << actual.fila << " COL: " << actual.columna << endl;
-    cout << "FILO: " << objetivosSeguidos.front().fila << " COLO: " << objetivosSeguidos.front().columna << endl;
-    cout << "Accion: " << accion << endl;
     return accion;
 }
 
@@ -1037,8 +1082,8 @@ bool ComportamientoJugador::pathFinding_costeUniforme(const estado &origen, cons
     current.secuencia.empty();
 
     //Inicialización de datos
-    current.st.zapatillas = false;
-    current.st.bikini = false;
+    current.st.zapatillas = zapatillas;
+    current.st.bikini = bikini;
     coste(current, actIDLE);
     current.valora = current.coste;
 
@@ -1300,16 +1345,12 @@ int ComportamientoJugador::calcularCantidadCasilla(unsigned char casilla) {
 
 double ComportamientoJugador::distancia(const estado &origen, const estado &destino) {
     //return abs(origen.fila-destino.fila) + abs(origen.columna-destino.columna);           //Manhattan
-    return sqrt(pow(origen.fila - destino.fila, 2) + pow(origen.columna - destino.columna, 2)); //Euclidiana
-}
-
-int ComportamientoJugador::mejordistancia(const estado &origen, const pair<bool, estado> *destino) {
-    int valor = 999999;
-    for(int i = 0; i < n_destinos; i++){
-        if(!destino[i].first && valor > distancia(origen, destino[i].second))
-            valor = distancia(origen, destino[i].second);
-    }
-    return valor;
+    //return sqrt(pow(origen.fila - destino.fila, 2) + pow(origen.columna - destino.columna, 2)); //Euclidiana
+    double dx = abs(origen.fila-destino.fila);
+    double dy = abs(origen.columna-destino.columna);
+    double D = 1.0;
+    double D2 = sqrt(2);
+    return  (D*(dx+dy) + (D2-2*D) * min(dx,dy));        //Distancia diagonal
 }
 
 bool ComportamientoJugador::pathFinding_algEstrella(const estado &origen, const estado &destino, list<Action> &plan) {
@@ -1324,8 +1365,8 @@ bool ComportamientoJugador::pathFinding_algEstrella(const estado &origen, const 
     current.secuencia.empty();
 
     //Inicialización de datos
-    current.st.zapatillas = false;
-    current.st.bikini = false;
+    current.st.zapatillas = zapatillas;
+    current.st.bikini = bikini;
     coste(current, actIDLE);
     current.valora = current.coste + distancia(current.st, destino);
 
@@ -1445,8 +1486,164 @@ bool ComportamientoJugador::pathFinding_algEstrella(const estado &origen, const 
     return false;
 }
 
+bool ComportamientoJugador::encontrado(const estado obj) {
+    for(int i = 0; i < objetivosV.size(); i++){
+        if(objetivosV[i].fila == obj.fila && objetivosV[i].columna == obj.columna)
+            return true;
+    }
+    return false;
+}
 
 
+bool ComportamientoJugador::objetivoEnVision(const estado objetivo) {
+
+    if(actual.orientacion == 0){
+        if((objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-1) ||
+        (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna) ||
+        (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+1) ||
+        (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-2) ||
+        (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-1) ||
+        (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna) ||
+        (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+1) ||
+        (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+2) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-3) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-2) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-1) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+1) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+2) ||
+        (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+3)){
+            return true;
+        }else return false;
+
+    }else if(actual.orientacion == 1){
+        if((objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna) ||
+                (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+1) ||
+                (objetivo.fila == actual.fila && objetivo.columna==actual.columna+1) ||
+                (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna) ||
+                (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+1) ||
+                (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+2) ||
+                (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+2) ||
+                (objetivo.fila == actual.fila && objetivo.columna==actual.columna+2) ||
+                (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna) ||
+                (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+1) ||
+                (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+2) ||
+                (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+3) ||
+                (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+3) ||
+                (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+3) ||
+                (objetivo.fila == actual.fila && objetivo.columna==actual.columna+3)){
+            return true;
+        }else return false;
+    }else if(actual.orientacion == 2){
+        if((objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+3)){
+            return true;
+        }else return false;
+    }else if(actual.orientacion == 3){
+        if((objetivo.fila == actual.fila && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna)){
+            return true;
+        }else return false;
+    }else if(actual.orientacion == 4){
+        if((objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+3) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna+1) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-3)){
+            return true;
+        }else return false;
+    }else if(actual.orientacion == 5){
+        if((objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-3)){
+            return true;
+        }else return false;
+    }else if(actual.orientacion == 6){
+        if((objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila+3 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila+2 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila+1 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-3)){
+            return true;
+        }else return false;
+    }else if(actual.orientacion == 7){
+        if((objetivo.fila == actual.fila && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna) ||
+           (objetivo.fila == actual.fila && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-1 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-2 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-3) ||
+           (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-2) ||
+           (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna-1) ||
+           (objetivo.fila == actual.fila-3 && objetivo.columna==actual.columna)){
+            return true;
+        }else return false;
+    }
+}
 
 int ComportamientoJugador::interact(Action accion, int valor)
 {
